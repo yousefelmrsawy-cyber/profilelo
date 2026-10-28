@@ -1,19 +1,22 @@
 const container = document.querySelector('.container');
 window.addEventListener('load', function () {
-        container.style.transition = 'all 1s ease-in';  
-})
+    container.style.transition = 'all 1s ease-in';  
+});
 
-let BO = false
-// Subtle parallax mouse tracking
+let BO = false;
+// Subtle parallax mouse tracking only for desktop pointer devices
 function DynamicRunner() {
-    window.addEventListener('mousemove', function(a) {
-        container.style.transition = 'all 0.01s ease-in';  
-        const HfWidth = document.documentElement.clientWidth / 2;
-        container.style.left = ((a.clientX - HfWidth) / 60) + 'px';
-    });
+    if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        window.addEventListener('mousemove', function(a) {
+            container.style.transition = 'all 0.05s ease-out';  
+            const HfWidth = document.documentElement.clientWidth / 2;
+            container.style.left = ((a.clientX - HfWidth) / 60) + 'px';
+        });
+    }
 }
 DynamicRunner();
-// Play GIF icons only ONCE per hover
+
+// Play GIF icons only ONCE per hover/tap
 document.querySelectorAll('.container button img, .container .avatar-circle img').forEach(img => {
     const originalSrc = img.getAttribute('src');
 
@@ -47,27 +50,32 @@ document.querySelectorAll('.container button img, .container .avatar-circle img'
     let playTimer = null;
     const trigger = img.closest('button, .avatar-circle');
 
+    function playGifOnce() {
+        clearTimeout(playTimer);
+        canvas.style.display = 'none';
+        img.style.display = 'block';
+
+        // Restart the GIF animation from frame 1
+        img.src = originalSrc.split('#')[0] + '#' + Date.now();
+
+        // Stop the animation after exactly 1 playback cycle
+        playTimer = setTimeout(() => {
+            img.style.display = 'none';
+            canvas.style.display = 'block';
+        }, duration);
+    }
+
     if (trigger) {
-        trigger.addEventListener('mouseenter', () => {
-            clearTimeout(playTimer);
-            canvas.style.display = 'none';
-            img.style.display = 'block';
-
-            // Restart the GIF animation from frame 1
-            img.src = originalSrc.split('#')[0] + '#' + Date.now();
-
-            // Stop the animation after exactly 1 playback cycle
-            playTimer = setTimeout(() => {
-                img.style.display = 'none';
-                canvas.style.display = 'block';
-            }, duration);
-        });
+        trigger.addEventListener('mouseenter', playGifOnce);
 
         trigger.addEventListener('mouseleave', () => {
             clearTimeout(playTimer);
             img.style.display = 'none';
             canvas.style.display = 'block';
         });
+
+        // Also trigger on touch/tap for mobile
+        trigger.addEventListener('touchstart', playGifOnce, { passive: true });
     }
 });
 
@@ -91,7 +99,7 @@ socialBtns.forEach(btn => {
             const email = btn.getAttribute('data-email') || 'y4610091@gmail.com';
             navigator.clipboard.writeText(email).then(() => {
                 const btnWrap = btn.closest('.btn-wrap');
-                const tooltip = btnWrap.querySelector('p');
+                const tooltip = btnWrap ? btnWrap.querySelector('p') : null;
                 if (tooltip) {
                     tooltip.textContent = 'Copied! ✓';
                     tooltip.classList.remove('copied');
@@ -105,54 +113,83 @@ socialBtns.forEach(btn => {
     });
 });
 
-// Reset Email tooltip back to "Email" ONLY after the mouse has left the button and faded out
+// Reset Email tooltip back to "Email" ONLY after the mouse/touch has left the button
 const emailButton = document.querySelector('.social-buttons button.email');
 if (emailButton) {
     const emailWrap = emailButton.closest('.btn-wrap');
-    const emailTooltip = emailWrap.querySelector('p');
+    const emailTooltip = emailWrap ? emailWrap.querySelector('p') : null;
     let resetTimer = null;
 
-    emailWrap.addEventListener('mouseleave', () => {
-        clearTimeout(resetTimer);
-        // Wait 300ms for the tooltip to fade out completely before quietly resetting text back to "Email"
-        resetTimer = setTimeout(() => {
-            if (!emailWrap.matches(':hover') && emailTooltip) {
-                emailTooltip.classList.remove('copied');
-                emailTooltip.textContent = 'Email';
-            }
-        }, 300);
+    if (emailWrap) {
+        emailWrap.addEventListener('mouseleave', () => {
+            clearTimeout(resetTimer);
+            resetTimer = setTimeout(() => {
+                if (!emailWrap.matches(':hover') && emailTooltip) {
+                    emailTooltip.classList.remove('copied');
+                    emailTooltip.textContent = 'Email';
+                }
+            }, 300);
+        });
+
+        emailWrap.addEventListener('mouseenter', () => {
+            clearTimeout(resetTimer);
+        });
+    }
+}
+
+// Avatar circle skills speech bubble toggle for mobile touch
+const avatarCircle = document.querySelector('.avatar-circle');
+if (avatarCircle) {
+    avatarCircle.addEventListener('click', (e) => {
+        // If clicking on or inside the bubble itself, don't toggle off immediately
+        if (e.target.closest('p')) return;
+        avatarCircle.classList.toggle('active');
     });
 
-    emailWrap.addEventListener('mouseenter', () => {
-        clearTimeout(resetTimer);
+    document.addEventListener('click', (e) => {
+        if (!avatarCircle.contains(e.target)) {
+            avatarCircle.classList.remove('active');
+        }
     });
 }
 
-// About Me focus modal and fog interaction
+// About Me modal controls (reliable for both mobile touch & desktop)
 const aboutBtn = document.querySelector('.about');
 const meCard = document.querySelector('.me');
 const fogBackdrop = document.querySelector('.fog-backdrop');
+const meCloseBtn = document.getElementById('meCloseBtn');
 
-if (aboutBtn && meCard) {
-    aboutBtn.addEventListener('focus', () => {
-        meCard.classList.add('active');
-        if (fogBackdrop) fogBackdrop.classList.add('active');
+function openAboutModal() {
+    if (meCard) meCard.classList.add('active');
+    if (fogBackdrop) fogBackdrop.classList.add('active');
+}
+
+function closeAboutModal() {
+    if (meCard) meCard.classList.remove('active');
+    if (fogBackdrop) fogBackdrop.classList.remove('active');
+    if (aboutBtn) aboutBtn.blur();
+}
+
+if (aboutBtn) {
+    aboutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (meCard && meCard.classList.contains('active')) {
+            closeAboutModal();
+        } else {
+            openAboutModal();
+        }
     });
 
-    aboutBtn.addEventListener('blur', () => {
-        setTimeout(() => {
-            if (!meCard.contains(document.activeElement) && document.activeElement !== aboutBtn) {
-                meCard.classList.remove('active');
-                if (fogBackdrop) fogBackdrop.classList.remove('active');
-            }
-        }, 150);
-    });
+    aboutBtn.addEventListener('focus', openAboutModal);
+}
 
-    if (fogBackdrop) {
-        fogBackdrop.addEventListener('click', () => {
-            meCard.classList.remove('active');
-            fogBackdrop.classList.remove('active');
-            aboutBtn.blur();
-        });
-    }
+if (meCloseBtn) {
+    meCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAboutModal();
+    });
+}
+
+if (fogBackdrop) {
+    fogBackdrop.addEventListener('click', closeAboutModal);
 }
